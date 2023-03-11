@@ -30,8 +30,9 @@ class EditorJsImageUploadController extends Controller
     /**
      * Upload file.
      */
-    public function file(Request $request): JsonResponse
+    public function file(Request $request, $path = ''): JsonResponse
     {
+
         $validator = Validator::make($request->all(), [
             'image' => 'required|image',
         ]);
@@ -42,32 +43,18 @@ class EditorJsImageUploadController extends Controller
             ]);
         }
 
-        $path = $request->file('image')->store(
-            config('nova-editor-js.toolSettings.image.path'),
-            config('nova-editor-js.toolSettings.image.disk')
+        $file = $request->file('image')->getClientOriginalName();
+
+        $request->file('image')->storeAs(
+            $path."/images/",
+            $file,
+            config('nova-editor-js.toolSettings.image.disk'),
         );
-
-        if (config('nova-editor-js.toolSettings.image.disk') !== 'local') {
-            $tempPath = $request->file('image')->store(
-                config('nova-editor-js.toolSettings.image.path'),
-                'local'
-            );
-
-            $this->applyAlterations(Storage::disk('local')->path($tempPath));
-            $thumbnails = $this->applyThumbnails($tempPath);
-
-            $this->deleteThumbnails(Storage::disk('local')->path($tempPath));
-            Storage::disk('local')->delete($tempPath);
-        } else {
-            $this->applyAlterations(Storage::disk(config('nova-editor-js.toolSettings.image.disk'))->path($path));
-            $thumbnails = $this->applyThumbnails($path);
-        }
 
         return response()->json([
             'success' => 1,
             'file' => [
-                'url' => Storage::disk(config('nova-editor-js.toolSettings.image.disk'))->url($path),
-                'thumbnails' => $thumbnails
+                'url' => 'https://cdn.wraxx.com/'.$path.'/images/'.$file
             ]
         ]);
     }
@@ -75,7 +62,7 @@ class EditorJsImageUploadController extends Controller
     /**
      * "Upload" a URL.
      */
-    public function url(Request $request): JsonResponse
+    public function url(Request $request,  $path = ''): JsonResponse
     {
         $validator = Validator::make($request->all(), [
             'url' => 'required|url',
@@ -107,7 +94,7 @@ class EditorJsImageUploadController extends Controller
         }
 
         $urlBasename = basename(parse_url(url($url), PHP_URL_PATH));
-        $nameWithPath = config('nova-editor-js.toolSettings.image.path') . '/' . uniqid() . $urlBasename;
+        $nameWithPath = $path . '/images/' . uniqid() . $urlBasename;
         Storage::disk(config('nova-editor-js.toolSettings.image.disk'))->put($nameWithPath, $response->body());
 
         return response()->json([
